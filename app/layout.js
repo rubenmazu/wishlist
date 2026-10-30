@@ -10,13 +10,29 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: '#9c2f52',
+  themeColor: '#3b9ede',
   viewportFit: 'cover',
 };
 
+// Script inline care aplica tema inainte de render — fara flash
+const themeScript = `
+  (function() {
+    try {
+      var saved = localStorage.getItem('theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'dark' || (!saved && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch(e) {}
+  })();
+`;
+
 export default function RootLayout({ children }) {
   return (
-    <html lang="ro">
+    <html lang="ro" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>
         {children}
         <RegisterSW />

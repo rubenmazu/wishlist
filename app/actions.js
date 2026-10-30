@@ -30,11 +30,11 @@ function parse(f) {
 // --- Auth -------------------------------------------------------------------
 
 export async function login(f) {
-  const email = String(f.get('email') || '').trim().toLowerCase();
+  const name = String(f.get('name') || '').trim();
   const password = String(f.get('password') || '');
   const { rows } = await db.execute({
-    sql: 'select id, password_hash from profiles where email = ?',
-    args: [email],
+    sql: 'select id, password_hash from profiles where lower(name) = lower(?)',
+    args: [name],
   });
   const user = rows[0];
   const ok = user && (await bcrypt.compare(password, user.password_hash));

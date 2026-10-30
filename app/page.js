@@ -11,17 +11,18 @@ import {
 } from './actions';
 import LinkActions from './ui/LinkActions';
 import ConfirmButton from './ui/ConfirmButton';
-import ReorderList from './ui/ReorderList';
+import ThemeToggle from './ui/ThemeToggle';
+import AddPanel from './ui/AddPanel';
 
 const money = new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' });
 
 function Fields({ item }) {
   return (
     <div className="stack">
-      <input name="title" placeholder="Ce îți dorești?" defaultValue={item?.title} maxLength={120} required />
-      <input name="url" placeholder="Link (opțional)" defaultValue={item?.url ?? ''} inputMode="url" />
-      <input name="price" placeholder="Preț în RON (opțional)" defaultValue={item?.price ?? ''} inputMode="decimal" />
-      <textarea name="note" placeholder="Notă: mărime, culoare, magazin…" defaultValue={item?.note ?? ''} maxLength={500} rows={2} />
+      <input name="title" placeholder="Ce vrei?" defaultValue={item?.title} maxLength={120} required />
+      <input name="url" placeholder="Link (optional)" defaultValue={item?.url ?? ''} inputMode="url" />
+      <input name="price" placeholder="Pret in RON (optional)" defaultValue={item?.price ?? ''} inputMode="decimal" />
+      <textarea name="note" placeholder="Nota: marime, culoare, magazin..." defaultValue={item?.note ?? ''} maxLength={500} rows={2} />
     </div>
   );
 }
@@ -30,13 +31,13 @@ function SortControl({ view, current }) {
   const opts = [
     ['position', 'Ordinea mea'],
     ['priority', 'Prioritate'],
-    ['price', 'Preț'],
-    ['date', 'Dată'],
+    ['price', 'Pret'],
+    ['date', 'Data'],
   ];
   const base = view === 'partner' ? '/?view=partner' : '/';
   const sep = base.includes('?') ? '&' : '?';
   return (
-    <nav className="sort" aria-label="Sortează">
+    <nav className="sort" aria-label="Sorteaza">
       {opts.map(([val, label]) => (
         <Link
           key={val}
@@ -50,89 +51,115 @@ function SortControl({ view, current }) {
   );
 }
 
-// Un produs de pe lista proprie.
-function OwnItem({ it }) {
+// Continutul unui produs propriu (fara wrapper card — cardul e pus de parinte)
+function OwnItemContent({ it }) {
   return (
-    <>
-      <div className="row">
-        <h2>{it.priority ? <span className="star" title="Îmi doresc tare asta">★</span> : null}{it.title}</h2>
-        {it.price != null && <span className="price">{money.format(it.price)}</span>}
-      </div>
-      {it.note && <p className="muted">{it.note}</p>}
-      {it.url && <LinkActions url={it.url} />}
-      <div className="item-actions">
-        <form action={setPriority}>
-          <input type="hidden" name="id" value={it.id} />
-          <input type="hidden" name="value" value={it.priority ? '0' : '1'} />
-          <button className="chip">{it.priority ? 'Scoate prioritatea' : 'Prioritate ★'}</button>
-        </form>
-        <details className="edit">
-          <summary>Editează</summary>
-          <form action={updateItem} className="panel">
+    <details className="item-details">
+      <summary className="item-summary">
+        <div className="title-row">
+          {it.priority ? <span className="star">★</span> : null}
+          <h2>{it.title}</h2>
+        </div>
+        <div className="right">
+          {it.price != null && <span className="price">{money.format(it.price)}</span>}
+          <span className="chevron">▼</span>
+        </div>
+      </summary>
+      <div className="item-body">
+        {it.note && <p className="muted">{it.note}</p>}
+        {it.url && <LinkActions url={it.url} />}
+        <div className="item-actions">
+          <form action={setPriority}>
             <input type="hidden" name="id" value={it.id} />
-            <Fields item={it} />
-            <div className="actions">
-              <button className="btn primary">Salvează</button>
-              <ConfirmButton formAction={deleteItem} className="btn danger" message="Sigur ștergi acest produs?">Șterge</ConfirmButton>
-            </div>
+            <input type="hidden" name="value" value={it.priority ? '0' : '1'} />
+            <button className="chip">{it.priority ? 'Scoate prioritatea' : '★ Prioritate'}</button>
           </form>
-        </details>
+          <details className="edit">
+            <summary>Editeaza</summary>
+            <form action={updateItem} className="panel">
+              <input type="hidden" name="id" value={it.id} />
+              <Fields item={it} />
+              <div className="actions">
+                <button className="btn primary">Salveaza</button>
+                <ConfirmButton formAction={deleteItem} className="btn danger" message="Sigur stergi acest produs?">Sterge</ConfirmButton>
+              </div>
+            </form>
+          </details>
+        </div>
       </div>
-    </>
+    </details>
   );
 }
 
-// Un produs al partenerului, cu stratul privat al viewer-ului.
-function PartnerItem({ it }) {
+// Continutul unui produs al partenerului
+function PartnerItemContent({ it }) {
   return (
-    <div className={it.purchased ? 'bought' : ''}>
-      <div className="row">
-        <h2>{it.priority ? <span className="star" title="Și-l dorește tare">★</span> : null}{it.title}</h2>
-        {it.price != null && <span className="price">{money.format(it.price)}</span>}
-      </div>
-      {it.note && <p className="muted">{it.note}</p>}
-      {it.private_note && <p className="private-note">🔒 {it.private_note}</p>}
-      {it.url && <LinkActions url={it.url} />}
-      <div className="item-actions">
-        <form action={togglePurchased}>
-          <input type="hidden" name="item_id" value={it.id} />
-          <button className="chip">{it.purchased ? 'Anulează „cumpărat”' : 'Marchează cumpărat'}</button>
-        </form>
-        <details className="edit">
-          <summary>Notă privată</summary>
-          <form action={savePrivateNote} className="panel">
+    <details className={`item-details${it.purchased ? ' bought' : ''}`}>
+      <summary className="item-summary">
+        <div className="title-row">
+          {it.priority ? <span className="star">★</span> : null}
+          <h2>{it.title}</h2>
+        </div>
+        <div className="right">
+          {it.price != null && <span className="price">{money.format(it.price)}</span>}
+          <span className="chevron">▼</span>
+        </div>
+      </summary>
+      <div className="item-body">
+        {it.note && <p className="muted">{it.note}</p>}
+        {it.private_note && <p className="private-note">🔒 {it.private_note}</p>}
+        {it.url && <LinkActions url={it.url} />}
+        <div className="item-actions">
+          <form action={togglePurchased}>
             <input type="hidden" name="item_id" value={it.id} />
-            <textarea name="note" placeholder="Doar tu vezi asta…" defaultValue={it.private_note ?? ''} maxLength={500} rows={2} />
-            <button className="btn primary">Salvează nota</button>
+            <button className="chip">{it.purchased ? 'Anuleaza cumparat' : '✓ Marcheaza cumparat'}</button>
           </form>
-        </details>
+          <details className="edit">
+            <summary>Nota privata</summary>
+            <form action={savePrivateNote} className="panel">
+              <input type="hidden" name="item_id" value={it.id} />
+              <textarea name="note" placeholder="Doar tu vezi asta..." defaultValue={it.private_note ?? ''} maxLength={500} rows={2} />
+              <button className="btn primary">Salveaza nota</button>
+            </form>
+          </details>
+        </div>
       </div>
-    </div>
+    </details>
   );
 }
 
-// O idee de cadou privată (distinctă vizual), editabilă de autor.
-function GiftIdea({ it }) {
+// Continutul unei idei de cadou private
+function GiftIdeaContent({ it }) {
   return (
-    <div className="idea">
-      <div className="row">
-        <h2><span className="idea-badge">Idee</span>{it.title}</h2>
-        {it.price != null && <span className="price">{money.format(it.price)}</span>}
+    <details className="item-details idea-details">
+      <summary className="item-summary">
+        <div className="title-row">
+          <span className="idea-badge">Idee</span>
+          <h2>{it.title}</h2>
+        </div>
+        <div className="right">
+          {it.price != null && <span className="price">{money.format(it.price)}</span>}
+          <span className="chevron">▼</span>
+        </div>
+      </summary>
+      <div className="item-body">
+        {it.note && <p className="muted">{it.note}</p>}
+        {it.url && <LinkActions url={it.url} />}
+        <div className="item-actions">
+          <details className="edit">
+            <summary>Editeaza ideea</summary>
+            <form action={updateGiftIdea} className="panel">
+              <input type="hidden" name="id" value={it.id} />
+              <Fields item={it} />
+              <div className="actions">
+                <button className="btn primary">Salveaza</button>
+                <ConfirmButton formAction={deleteGiftIdea} className="btn danger" message="Sigur stergi aceasta idee?">Sterge</ConfirmButton>
+              </div>
+            </form>
+          </details>
+        </div>
       </div>
-      {it.note && <p className="muted">{it.note}</p>}
-      {it.url && <LinkActions url={it.url} />}
-      <details className="edit">
-        <summary>Editează ideea</summary>
-        <form action={updateGiftIdea} className="panel">
-          <input type="hidden" name="id" value={it.id} />
-          <Fields item={it} />
-          <div className="actions">
-            <button className="btn primary">Salvează</button>
-            <ConfirmButton formAction={deleteGiftIdea} className="btn danger" message="Sigur ștergi această idee?">Șterge</ConfirmButton>
-          </div>
-        </form>
-      </details>
-    </div>
+    </details>
   );
 }
 
@@ -154,82 +181,79 @@ export default async function Home({ searchParams }) {
     : await getPartnerList(userId, partner.id, sort);
 
   const budget = totalBudget(entries);
-  // Reordonarea manuală are sens doar peste ordinea salvată (fără sortare activă).
   const canReorder = !sort || sort === 'position';
+
+  function renderItem(it) {
+    if (own) return <OwnItemContent it={it} />;
+    if (it.kind === 'idea') return <GiftIdeaContent it={it} />;
+    return <PartnerItemContent it={it} />;
+  }
 
   return (
     <main className="wrap">
+      <div className="app-header">
+        <span className="app-title">💝 Wishlist</span>
+      </div>
+
       <nav className="tabs" aria-label="Alege wishlistul">
         <Link href="/" className={own ? 'on' : ''}>{me.name}</Link>
         {partner
           ? <Link href="/?view=partner" className={!own ? 'on' : ''}>{partner.name}</Link>
-          : <span className="muted">Al doilea cont nu e creat încă</span>}
+          : <span className="muted">Al doilea cont nu e creat inca</span>}
       </nav>
 
       <header className="head">
-        <h1>{own ? 'Wishlistul tău' : `Wishlistul lui ${target.name}`}</h1>
-        <form action={logout}><button className="btn ghost">Ieși</button></form>
+        <h1>{own ? 'Wishlistul tau' : `Wishlistul lui ${target.name}`}</h1>
+        <div className="head-actions">
+          <ThemeToggle />
+          <form action={logout}><button className="btn ghost">Iesi</button></form>
+        </div>
       </header>
 
       <div className="toolbar">
         <SortControl view={view} current={sort} />
-        {budget > 0 && <span className="budget" title="Suma prețurilor afișate">Total: {money.format(budget)}</span>}
+        {budget > 0 && <span className="budget" title="Suma preturilor afisate">Total: {money.format(budget)}</span>}
       </div>
 
       {own && (
-        <details className="add">
-          <summary className="btn primary">Adaugă un produs</summary>
-          <form action={addItem} className="panel">
-            <Fields />
-            <button className="btn primary">Adaugă</button>
-          </form>
-        </details>
+        <AddPanel action={addItem} summary="+ Adauga un produs">
+          <Fields />
+        </AddPanel>
       )}
 
       {!own && (
-        <details className="add">
-          <summary className="btn">Adaugă o idee privată</summary>
-          <form action={addGiftIdea} className="panel">
-            <input type="hidden" name="target_owner_id" value={partner.id} />
-            <Fields />
-            <p className="muted small">Doar tu vei vedea această idee — {target.name} nu.</p>
-            <button className="btn primary">Adaugă ideea</button>
-          </form>
-        </details>
+        <AddPanel action={addGiftIdea} summary="+ Adauga o idee privata">
+          <input type="hidden" name="target_owner_id" value={partner.id} />
+          <Fields />
+          <p className="muted small">Doar tu vei vedea aceasta idee.</p>
+        </AddPanel>
       )}
 
       {entries.length === 0 && (
-        <p className="muted empty">{own ? 'Lista e goală. Adaugă primul lucru pe care ți l-ai dori.' : `${target.name} n-a adăugat nimic încă.`}</p>
+        <p className="muted empty">{own ? 'Lista e goala. Adauga primul produs.' : `${target.name} nu a adaugat nimic inca.`}</p>
       )}
 
       {entries.length > 0 && (
-        canReorder
-          ? (
-            <ReorderList
-              action={own ? reorderOwn : reorderPartner}
-              mode={own ? 'own' : 'partner'}
-              entries={entries.map((it) => ({
-                key: `${it.kind}:${it.id}`,
-                node: own
-                  ? <OwnItem it={it} />
-                  : it.kind === 'idea' ? <GiftIdea it={it} /> : <PartnerItem it={it} />,
-              }))}
-            />
-          )
-          : (
-            <ul className="list">
-              {entries.map((it) => (
-                <li key={`${it.kind}:${it.id}`} className="item">
-                  {own
-                    ? <OwnItem it={it} />
-                    : it.kind === 'idea'
-                      ? <GiftIdea it={it} />
-                      : <PartnerItem it={it} />}
-                </li>
-              ))}
-            </ul>
-          )
+        <ul className="list">
+          {entries.map((it) => (
+            <li key={`${it.kind}:${it.id}`} className="item">
+              {own
+                ? <OwnItemContent it={it} />
+                : it.kind === 'idea'
+                  ? <GiftIdeaContent it={it} />
+                  : <PartnerItemContent it={it} />}
+            </li>
+          ))}
+        </ul>
       )}
+
+      <footer className="footer">
+        <span>Crafted with <span className="footer-heart">♥</span> by <strong>Ruben</strong></span>
+        <span className="footer-dot">·</span>
+        <span>Software Engineer</span>
+        <span className="footer-dot">·</span>
+        <span>© {new Date().getFullYear()}</span>
+      </footer>
     </main>
   );
 }

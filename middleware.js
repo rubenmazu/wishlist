@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getUserIdFromRequest } from './lib/session';
 
+export const runtime = 'nodejs';
+
 export function middleware(req) {
   const userId = getUserIdFromRequest(req);
   const onLogin = req.nextUrl.pathname.startsWith('/login');

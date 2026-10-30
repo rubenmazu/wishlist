@@ -1,10 +1,6 @@
 'use client';
 import { useState, useRef, useTransition } from 'react';
 
-// Listă reordonabilă. Primește:
-// - entries: [{ key, node }]  (key stabil "kind:id" + conținutul randat pe server)
-// - action: Server Action
-// - mode: 'own' (trimite `ids`) sau 'partner' (trimite `entries` cu "kind:id")
 export default function ReorderList({ entries, action, mode }) {
   const field = mode === 'own' ? 'ids' : 'entries';
   const serialize = (keys) =>
@@ -27,8 +23,8 @@ export default function ReorderList({ entries, action, mode }) {
       try {
         await action(fd);
       } catch {
-        setOrder(prev.current); // revenire la eroare (R1.4)
-        setError('Nu am putut salva ordinea. Încearcă din nou.');
+        setOrder(prev.current);
+        setError('Nu am putut salva ordinea. Incearca din nou.');
       }
     });
   }
@@ -54,8 +50,8 @@ export default function ReorderList({ entries, action, mode }) {
 
   return (
     <ul className="list" aria-busy={pending}>
-      {error && <li className="err" role="alert">{error}</li>}
-      {order.map((key) => (
+      {error && <li style={{gridColumn:'1/-1'}}><p className="err" role="alert">{error}</p></li>}
+      {order.map((key, idx) => (
         <li
           key={key}
           className="item reorderable"
@@ -64,9 +60,9 @@ export default function ReorderList({ entries, action, mode }) {
           onDragOver={(e) => e.preventDefault()}
           onDrop={() => onDrop(key)}
         >
-          <div className="reorder-handles" aria-hidden="false">
-            <button type="button" className="handle" aria-label="Mută mai sus" onClick={() => move(key, -1)}>↑</button>
-            <button type="button" className="handle" aria-label="Mută mai jos" onClick={() => move(key, 1)}>↓</button>
+          <div className="reorder-handles">
+            <button type="button" className="handle" aria-label="Muta mai sus" onClick={() => move(key, -1)} disabled={idx === 0}>↑</button>
+            <button type="button" className="handle" aria-label="Muta mai jos" onClick={() => move(key, 1)} disabled={idx === order.length - 1}>↓</button>
           </div>
           <div className="reorder-body">{byKey.get(key)}</div>
         </li>
