@@ -1,13 +1,15 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { createClient } from '../lib/supabase/server';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { db } from '../lib/db';
+import { getUserId, setSession, clearSession } from '../lib/session';
 
 async function authed() {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) redirect('/login');
-  return { sb, user };
+  const userId = await getUserId();
+  if (!userId) redirect('/login');
+  return userId;
 }
 
 function parse(f) {
@@ -25,38 +27,178 @@ function parse(f) {
   };
 }
 
+// --- Auth -------------------------------------------------------------------
+
 export async function login(f) {
-  const sb = await createClient();
-  const { error } = await sb.auth.signInWithPassword({
-    email: String(f.get('email') || '').trim(),
-    password: String(f.get('password') || ''),
+  const email = String(f.get('email') || '').trim().toLowerCase();
+  const password = String(f.get('password') || '');
+  const { rows } = await db.execute({
+    sql: 'select id, password_hash from profiles where email = ?',
+    args: [email],
   });
-  if (error) redirect('/login?error=1');
+  const user = rows[0];
+  const ok = user && (await bcrypt.compare(password, user.password_hash));
+  if (!ok) redirect('/login?error=1');
+  await setSession(user.id);
   redirect('/');
 }
 
 export async function logout() {
-  const sb = await createClient();
-  await sb.auth.signOut();
+  await clearSession();
   redirect('/login');
 }
 
+// --- Lista proprie ----------------------------------------------------------
+
 export async function addItem(f) {
-  const { sb, user } = await authed();
+  const userId = await authed();
   const v = parse(f);
-  if (v) await sb.from('items').insert({ ...v, owner_id: user.id });
+  if (v) {
+    // Poziție la coada listei proprii.
+    const { rows } = await db.execute({
+      sql: 'select max(position) as m from items where owner_id = ?',
+      args: [userId],
+    });
+    const next = (rows[0]?.m ?? -1) + 1;
+    await db.execute({
+      sql: 'insert into items (id, owner_id, title, url, price, note, position) values (?, ?, ?, ?, ?, ?, ?)',
+      args: [crypto.randomUUID(), userId, v.title, v.url, v.price, v.note, next],
+    });
+  }
   revalidatePath('/');
 }
 
 export async function updateItem(f) {
-  const { sb, user } = await authed();
+  const userId = await authed();
   const v = parse(f);
-  if (v) await sb.from('items').update(v).eq('id', String(f.get('id'))).eq('owner_id', user.id);
+  if (v) {
+    await db.execute({
+      sql: 'update items set title = ?, url = ?, price = ?, note = ? where id = ? and owner_id = ?',
+      args: [v.title, v.url, v.price, v.note, String(f.get('id')), userId],
+    });
+  }
   revalidatePath('/');
 }
 
 export async function deleteItem(f) {
-  const { sb, user } = await authed();
-  await sb.from('items').delete().eq('id', String(f.get('id'))).eq('owner_id', user.id);
+  const userId = await authed();
+  await db.execute({
+    sql: 'delete from items where id = ? and owner_id = ?',
+    args: [String(f.get('id')), userId],
+  });
+  revalidatePath('/');
+}
+
+export async function setPriority(f) {
+  const userId = await authed();
+  const value = String(f.get('value')) === '1' ? 1 : 0;
+  await db.execute({
+    sql: 'update items set priority = ? where id = ? and owner_id = ?',
+    args: [value, String(f.get('id')), userId],
+  });
+  revalidatePath('/');
+}
+
+export async function reorderOwn(f) {
+  const userId = await authed();
+  const ids = String(f.get('ids') || '').split(',').filter(Boolean);
+  for (let i = 0; i < ids.length; i++) {
+    await db.execute({
+      sql: 'update items set position = ? where id = ? and owner_id = ?',
+      args: [i, ids[i], userId],
+    });
+  }
+  revalidatePath('/');
+}
+
+// --- Stratul privat (lista partenerului) ------------------------------------
+
+async function upsertState(viewerId, itemId, column, value) {
+  // Coloană controlată intern (nu din input utilizator) => sigur de interpolat.
+  await db.execute({
+    sql: `insert into viewer_item_state (viewer_id, item_id, ${column})
+          values (?, ?, ?)
+          on conflict(viewer_id, item_id) do update set ${column} = excluded.${column}`,
+    args: [viewerId, itemId, value],
+  });
+}
+
+export async function togglePurchased(f) {
+  const userId = await authed();
+  const itemId = String(f.get('item_id'));
+  const { rows } = await db.execute({
+    sql: 'select purchased from viewer_item_state where viewer_id = ? and item_id = ?',
+    args: [userId, itemId],
+  });
+  const next = rows[0]?.purchased ? 0 : 1;
+  await upsertState(userId, itemId, 'purchased', next);
+  revalidatePath('/');
+}
+
+export async function savePrivateNote(f) {
+  const userId = await authed();
+  const itemId = String(f.get('item_id'));
+  const text = String(f.get('note') || '').trim().slice(0, 500) || null;
+  await upsertState(userId, itemId, 'private_note', text);
+  revalidatePath('/');
+}
+
+export async function reorderPartner(f) {
+  const userId = await authed();
+  // Fiecare intrare: "kind:id" (ex. "item:abc", "idea:xyz").
+  const entries = String(f.get('entries') || '').split(',').filter(Boolean);
+  for (let i = 0; i < entries.length; i++) {
+    const [kind, id] = entries[i].split(':');
+    if (kind === 'item') {
+      await upsertState(userId, id, 'position', i);
+    } else if (kind === 'idea') {
+      await db.execute({
+        sql: 'update gift_ideas set position = ? where id = ? and author_id = ?',
+        args: [i, id, userId],
+      });
+    }
+  }
+  revalidatePath('/');
+}
+
+// --- Idei de cadou private --------------------------------------------------
+
+export async function addGiftIdea(f) {
+  const userId = await authed();
+  const v = parse(f);
+  const targetOwnerId = String(f.get('target_owner_id'));
+  if (v && targetOwnerId && targetOwnerId !== userId) {
+    const { rows } = await db.execute({
+      sql: 'select max(position) as m from gift_ideas where author_id = ? and target_owner_id = ?',
+      args: [userId, targetOwnerId],
+    });
+    const next = (rows[0]?.m ?? -1) + 1;
+    await db.execute({
+      sql: `insert into gift_ideas (id, author_id, target_owner_id, title, url, price, note, position)
+            values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [crypto.randomUUID(), userId, targetOwnerId, v.title, v.url, v.price, v.note, next],
+    });
+  }
+  revalidatePath('/');
+}
+
+export async function updateGiftIdea(f) {
+  const userId = await authed();
+  const v = parse(f);
+  if (v) {
+    await db.execute({
+      sql: 'update gift_ideas set title = ?, url = ?, price = ?, note = ? where id = ? and author_id = ?',
+      args: [v.title, v.url, v.price, v.note, String(f.get('id')), userId],
+    });
+  }
+  revalidatePath('/');
+}
+
+export async function deleteGiftIdea(f) {
+  const userId = await authed();
+  await db.execute({
+    sql: 'delete from gift_ideas where id = ? and author_id = ?',
+    args: [String(f.get('id')), userId],
+  });
   revalidatePath('/');
 }

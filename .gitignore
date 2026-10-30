@@ -1,3 +1,18 @@
 node_modules
 .next
 .env.local
+.env*.local
+
+# Bază de date locală (SQLite)
+local.db
+*.db
+*.db-journal
+*.sqlite
+
+# Loguri
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+.vscode/

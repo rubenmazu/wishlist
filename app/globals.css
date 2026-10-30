@@ -33,3 +33,40 @@ summary{cursor:pointer;list-style:none}summary::-webkit-details-marker{display:n
 .edit{margin-top:10px}.edit summary{display:inline;color:var(--muted);font-size:.9rem;text-decoration:underline;text-underline-offset:3px}
 .empty{padding:32px 0;text-align:center}
 @media (prefers-reduced-motion:no-preference){.btn{transition:transform .12s}.btn:active{transform:scale(.98)}}
+
+/* --- private-gift-layer ------------------------------------------------- */
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sort{display:flex;gap:4px;flex-wrap:wrap}
+.sort a{padding:6px 12px;font-size:.85rem;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:999px}
+.sort a.on{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+.budget{font-size:.9rem;color:var(--muted);white-space:nowrap}
+.small{font-size:.85rem}
+
+.star{color:var(--accent);margin-right:6px}
+.item-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.chip{padding:6px 12px;font:inherit;font-size:.85rem;font-weight:500;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+
+/* Produs cumpărat (privat): estompat, tăiat, trimis vizual în fundal */
+.bought{opacity:.55}
+.bought h2{text-decoration:line-through}
+.bought .row h2::after{content:" ✓ cumpărat";font-size:.75rem;color:var(--accent);text-decoration:none;font-weight:500;white-space:nowrap}
+
+/* Idee de cadou privată: distinctă vizual */
+.idea{border-left:3px solid var(--accent);padding-left:12px}
+.idea-badge{display:inline-block;margin-right:8px;padding:1px 8px;font-size:.7rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);border-radius:999px;vertical-align:middle}
+
+/* Notă privată */
+.private-note{color:var(--muted);font-style:italic;background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:8px 10px;margin:6px 0}
+
+/* Acțiuni link */
+.link-actions{display:inline-flex;align-items:center;gap:12px;margin-top:6px;flex-wrap:wrap}
+.link-copy{padding:2px 10px;font:inherit;font-size:.8rem;color:var(--muted);background:none;border:1px solid var(--line);border-radius:999px;cursor:pointer}
+.link-msg{font-size:.8rem;color:var(--accent)}
+
+/* Reordonare */
+.item.reorderable{display:flex;gap:12px;align-items:flex-start}
+.reorder-handles{display:flex;flex-direction:column;gap:2px;flex:0 0 auto}
+.handle{width:28px;height:24px;line-height:1;font-size:.9rem;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:8px;cursor:grab;padding:0}
+.handle:hover{border-color:var(--accent);color:var(--accent)}
+.reorder-body{flex:1 1 auto;min-width:0}
